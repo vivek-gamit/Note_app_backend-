@@ -1,55 +1,53 @@
-// server ko create karna 
-const express = require('express')
+const express = require('express');
+const multer = require('multer')
+const uploadFile = require('./services/storage.service')
+require("dotenv").config()
+const postModel = require("./models/post.model")
 
-const app = express()
-app.use(express.json())
-const notes = []
 
-//title, decription
-//post/notes
+const app = express();
+app.use(express.json());
 
-app.post('/notes', (req,res) =>{
-    const NewNote = req.body;
+const upload = multer({storage: multer.memoryStorage()})
 
-    notes.push(NewNote);
+app.post('/create-post', upload.single("image"), async (req, res) => {
+    try {
+        console.log("Body:", req.body);
+        console.log("File:", req.file);
 
-    res.status(201).json({
-        message: "note created successfully",
-        note:NewNote
-    })
-    
-})
+        // 1. Safety check to prevent the 'undefined' error
+        if (!req.file) {
+            return res.status(400).json({ message: "Please upload an image using the key 'image'" });
+        }
 
-//get/notes
-app.get('/notes', (req,res) => {
+        // 2. Call your service
+        const result = await uploadFile(req.file.buffer);
 
-    res.status(200).json({
-        message:"note fetch successfuly",
-        notes:notes
-    })
-})
+        const post = await postModel.create({
+            image: result.url,
+            caption: req.body.caption,
+        })
 
-app.delete('/notes/:index', (req,res) =>{
-    const index = req.params.index
+        return res.status(201).json({
+            message: "Post created successfully",
+            post
+        })
 
-    delete notes[index]
 
-    res.status(200).json({
-        message:'note deleted successfully'
-    })
-})
+    } catch (error) {
+        console.error("Error in /create-post:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
 
-app.patch('/notes/:index', (req, res) => {
-    const index = req.params.index
-    const description = req.body.description
-    const title = req.body.title
+app.get('/posts', async(req, res) => {
+    const posts = await postModel.find()
 
-    notes[index].description = description
-    notes[index].title = title
-
-    res.status(200).json({
-        message:"note updated successfully..."
+    return res.status(200).json({
+        message: "Post fetched successfully",
+        posts
     })
 })
 
-module.exports = app
+
+module.exports = app;
